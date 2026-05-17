@@ -130,8 +130,4 @@ To deploy on Walrus — upload `index.html` to Walgo at walgoweb.wal.app, connec
 - Telegram: @DeGodman11
 - Email: kaykrypto10@gmail.com
 
----
 
-## License
-
-MIT
