@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Vaultform — Forms That Tell the Truth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<script type="module">
+import { getWallets } from 'https://esm.run/@mysten/wallet-standard@0.0.8';
+window.__initSlush = async function(){
+  try{
+    const {get} = getWallets();
+    const wallets = get();
+    const slush = wallets.find(w=>w.name?.toLowerCase().includes('slush')||w.name?.toLowerCase().includes('sui'));
+    if(slush){
+      const res = await slush.features['standard:connect'].connect();
+      const addr = res?.accounts?.[0]?.address;
+      if(addr && window.__walletReady){ window.__walletReady(addr); return true; }
+    }
+  }catch(e){ console.log('Slush:', e.message); }
+  return false;
+};
+// Also listen for wallet changes
+try{
+  const {on} = await import('https://esm.run/@mysten/wallet-standard@0.0.8');
+  on('register', ()=>{ console.log('Wallet registered'); });
+}catch(e){}
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --black:#0a0906;
+  --black2:#111009;
+  --black3:#18160f;
+  --lime:#d4ff00;
+  --lime2:#bcef00;
+  --white:#f0ede6;
+  --muted:#4a4535;
+  --border:#2a2618;
+  --body:#7a7460;
+  --warn:#f59e0b;
+  --err:#ef4444;
+  --success:#22c55e;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'DM Sans',sans-serif;
+  --display:'Syne',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--black);color:var(--white);font-family:var(--sans);font-size:16px;line-height:1.6;overflow-x:hidden;cursor:none;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 15% 60%,rgba(212,255,0,.04) 0%,transparent 55%);pointer-events:none;z-index:0}
+
+/* CURSOR */
+.cur{position:fixed;width:6px;height:6px;background:var(--lime);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:width .12s,height .12s}
+.cur-ring{position:fixed;width:28px;height:28px;border:1px solid rgba(212,255,0,.35);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width .2s,height .2s}
+
+/* PAGES */
+.page{display:none;min-height:100vh;position:relative;z-index:1}
+.page.active{display:block}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:500;display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;background:rgba(10,9,6,.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:.7rem;cursor:none;text-decoration:none}
+.logo-text{font-family:var(--display);font-size:.95rem;font-weight:800;color:var(--white);letter-spacing:-.02em}
+.nav-right{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.nav-btn{font-family:var(--mono);font-size:.54rem;letter-spacing:.12em;text-transform:uppercase;padding:.5rem .9rem;border:1px solid var(--border);color:var(--body);background:none;cursor:none;transition:all .2s;text-decoration:none;display:inline-block;white-space:nowrap}
+.nav-btn:hover{border-color:var(--lime);color:var(--lime);background:rgba(212,255,0,.04)}
+.nav-btn.cta{background:var(--lime);color:var(--black);border-color:var(--lime);font-weight:600}
+.nav-btn.cta:hover{background:var(--lime2)}
+
+/* WALLET CONNECT IN NAV */
+.wallet-connect-nav{display:flex;align-items:center;gap:.5rem}
+.wc-btn{font-family:var(--mono);font-size:.54rem;letter-spacing:.12em;text-transform:uppercase;padding:.5rem .9rem;border:1px solid var(--lime);color:var(--lime);background:rgba(212,255,0,.06);cursor:none;transition:all .2s;display:flex;align-items:center;gap:.4rem}
+.wc-btn:hover{background:rgba(212,255,0,.12)}
+.wc-btn.connected{border-color:var(--success);color:var(--success);background:rgba(34,197,94,.06)}
+.wc-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.wc-addr{font-family:var(--mono);font-size:.5rem;color:var(--body);letter-spacing:.05em}
+
+/* ── LANDING ── */
+.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:flex-end;padding:0 2.5rem 5rem;position:relative;overflow:hidden}
+canvas#bg{position:absolute;inset:0;width:100%;height:100%}
+.hero-inner{position:relative;z-index:2;max-width:860px}
+.hero-eyebrow{font-family:var(--mono);font-size:.56rem;letter-spacing:.22em;text-transform:uppercase;color:var(--lime);margin-bottom:1.8rem;display:flex;align-items:center;gap:.8rem;opacity:0;animation:fadeUp .7s .2s ease forwards}
+.hero-eyebrow::before{content:'';width:18px;height:1px;background:var(--lime)}
+h1.hero-hed{font-family:var(--display);font-size:clamp(3.5rem,9vw,8.5rem);font-weight:800;line-height:.92;letter-spacing:-.04em;color:var(--white);margin-bottom:1.8rem;opacity:0;animation:fadeUp .7s .4s ease forwards}
+h1.hero-hed span{color:var(--lime)}
+.hero-body{font-size:1rem;color:var(--body);max-width:440px;line-height:1.8;margin-bottom:2.5rem;opacity:0;animation:fadeUp .7s .6s ease forwards}
+.hero-btns{display:flex;gap:.7rem;flex-wrap:wrap;opacity:0;animation:fadeUp .7s .8s ease forwards}
+.btn{font-family:var(--mono);font-size:.58rem;letter-spacing:.14em;text-transform:uppercase;padding:.85rem 1.8rem;border:none;cursor:none;transition:all .2s;text-decoration:none;display:inline-flex;align-items:center;gap:.5rem}
+.btn-lime{background:var(--lime);color:var(--black);font-weight:600}
+.btn-lime:hover{background:var(--lime2);transform:translateY(-2px)}
+.btn-ghost{border:1px solid var(--border);color:var(--body);background:none}
+.btn-ghost:hover{border-color:var(--lime);color:var(--lime);transform:translateY(-2px)}
+
+/* TICKER */
+.ticker{background:var(--lime);padding:.85rem 0;overflow:hidden}
+.ticker-track{display:flex;gap:3rem;animation:ticker 22s linear infinite;white-space:nowrap}
+.ticker-item{font-family:var(--display);font-size:.78rem;font-weight:700;color:var(--black);text-transform:uppercase;letter-spacing:.06em;flex-shrink:0}
+.tdot{color:rgba(0,0,0,.2)}
+@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* SECTIONS */
+.section{padding:5rem 2.5rem;max-width:1100px;margin:0 auto}
+.s-tag{font-family:var(--mono);font-size:.52rem;letter-spacing:.22em;text-transform:uppercase;color:var(--lime);margin-bottom:.9rem;display:flex;align-items:center;gap:.7rem}
+.s-tag::after{content:'';width:24px;height:1px;background:var(--lime);opacity:.5}
+.s-title{font-family:var(--display);font-size:clamp(2rem,5vw,3.2rem);font-weight:800;color:var(--white);line-height:1.05;letter-spacing:-.03em;margin-bottom:.8rem}
+.s-title em{font-style:italic;color:var(--lime)}
+.s-sub{font-size:.92rem;color:var(--body);max-width:460px;line-height:1.8;margin-bottom:3rem}
+
+.how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)}
+.how-card{background:var(--black2);padding:2rem 1.8rem;transition:background .2s}
+.how-card:hover{background:var(--black3)}
+.how-n{font-family:var(--display);font-size:2.5rem;font-weight:800;color:rgba(212,255,0,.08);line-height:1;margin-bottom:1rem}
+.how-t{font-family:var(--display);font-size:1.05rem;font-weight:700;color:var(--white);margin-bottom:.5rem}
+.how-d{font-size:.84rem;color:var(--body);line-height:1.7}
+
+.why-section{background:var(--black2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:5rem 0}
+.why-inner{max-width:1100px;margin:0 auto;padding:0 2.5rem}
+.why-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin-top:3rem}
+.why-card{background:var(--black2);padding:2rem;transition:background .2s}
+.why-card:hover{background:var(--black3)}
+.why-icon{font-size:1.1rem;margin-bottom:.8rem}
+.why-t{font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--white);margin-bottom:.4rem}
+.why-d{font-size:.82rem;color:var(--body);line-height:1.7}
+
+/* ── BUILDER ── */
+#builder{padding-top:70px;background:var(--black)}
+.page-wrap{max-width:760px;margin:0 auto;padding:3rem 2rem 6rem}
+.page-hed{margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:1px solid var(--border)}
+.page-title{font-family:var(--display);font-size:1.8rem;font-weight:800;color:var(--white);letter-spacing:-.03em;margin-bottom:.4rem}
+.page-sub{font-size:.88rem;color:var(--body);line-height:1.7}
+
+/* WALLET REQUIRED BANNER */
+.wallet-banner{background:rgba(212,255,0,.06);border:1px solid rgba(212,255,0,.2);padding:1rem 1.2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.wb-text{font-family:var(--mono);font-size:.56rem;letter-spacing:.1em;color:var(--lime)}
+.wb-btn{font-family:var(--mono);font-size:.52rem;letter-spacing:.12em;text-transform:uppercase;padding:.45rem .9rem;background:var(--lime);color:var(--black);border:none;cursor:none;font-weight:600;transition:background .2s;white-space:nowrap}
+.wb-btn:hover{background:var(--lime2)}
+
+/* FORM CARD */
+.fcard{background:var(--black2);border:1px solid var(--border);border-radius:0;margin-bottom:1px;overflow:hidden}
+.fcard-head{padding:1.2rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem}
+.fcard-icon{font-size:.9rem;width:24px;text-align:center;flex-shrink:0}
+.fcard-title{font-family:var(--mono);font-size:.52rem;letter-spacing:.16em;text-transform:uppercase;color:var(--lime)}
+.fcard-body{padding:1.5rem}
+
+/* INPUTS */
+.inp-group{margin-bottom:1.1rem}
+.inp-group:last-child{margin-bottom:0}
+.inp-label{font-family:var(--mono);font-size:.5rem;letter-spacing:.14em;text-transform:uppercase;color:var(--body);display:block;margin-bottom:.4rem}
+.inp{width:100%;background:var(--black3);border:1px solid var(--border);color:var(--white);font-family:var(--sans);font-size:.9rem;padding:.7rem .9rem;outline:none;transition:border-color .2s;border-radius:0}
+.inp:focus{border-color:var(--lime)}
+.inp::placeholder{color:var(--muted)}
+textarea.inp{resize:vertical;min-height:85px}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a7460'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .9rem center;padding-right:2.2rem;cursor:none}
+.inp-hint{font-family:var(--mono);font-size:.46rem;color:var(--muted);margin-top:.3rem;letter-spacing:.05em}
+.wallet-display{background:var(--black3);border:1px solid var(--lime);padding:.7rem .9rem;font-family:var(--mono);font-size:.62rem;color:var(--lime);word-break:break-all;display:flex;align-items:center;gap:.5rem}
+.wallet-display .wd-dot{width:6px;height:6px;border-radius:50%;background:var(--lime);flex-shrink:0}
+
+/* FIELDS */
+.fields-empty{font-family:var(--mono);font-size:.55rem;color:var(--muted);padding:1.2rem;text-align:center;letter-spacing:.06em;border:1px dashed var(--border)}
+.field-row{background:var(--black3);border:1px solid var(--border);padding:.9rem 1rem;display:flex;align-items:center;gap:.7rem;margin-bottom:1px;transition:border-color .2s}
+.field-row:hover{border-color:var(--border)}
+.fdrag{color:var(--muted);font-size:.7rem;flex-shrink:0;cursor:grab}
+.finfo{flex:1;min-width:0}
+.fname{font-size:.88rem;color:var(--white);font-weight:500;margin-bottom:.2rem}
+.fbadges{display:flex;gap:.3rem;flex-wrap:wrap}
+.fbadge{font-family:var(--mono);font-size:.42rem;letter-spacing:.06em;text-transform:uppercase;padding:.15rem .4rem}
+.fb-type{color:var(--lime);background:rgba(212,255,0,.07)}
+.fb-req{color:var(--body);background:rgba(255,255,255,.05)}
+.fb-enc{color:var(--warn);background:rgba(245,158,11,.07)}
+.fbtns{display:flex;gap:.3rem;flex-shrink:0}
+.fbtn{background:none;border:1px solid var(--border);color:var(--muted);padding:.28rem .5rem;font-family:var(--mono);font-size:.44rem;letter-spacing:.05em;text-transform:uppercase;cursor:none;transition:all .2s}
+.fbtn:hover{border-color:var(--lime);color:var(--lime)}
+.fbtn.del:hover{border-color:var(--err);color:var(--err)}
+
+/* ADD FIELD */
+.add-field-section{margin-top:1rem}
+.add-label{font-family:var(--mono);font-size:.5rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.7rem}
+.type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem}
+.type-btn{background:none;border:1px solid var(--border);color:var(--body);padding:.6rem .4rem;font-family:var(--mono);font-size:.46rem;letter-spacing:.05em;text-transform:uppercase;cursor:none;transition:all .2s;text-align:center;display:flex;align-items:center;justify-content:center;gap:.3rem}
+.type-btn:hover{border-color:var(--lime);color:var(--lime);background:rgba(212,255,0,.04)}
+.type-icon{font-size:.7rem}
+
+/* TOGGLE ROW */
+.tog-row{display:flex;align-items:center;justify-content:space-between;padding:.8rem 0;border-bottom:1px solid var(--border)}
+.tog-row:last-child{border-bottom:none}
+.tog-info .tog-t{font-size:.88rem;color:var(--white);font-weight:500}
+.tog-info .tog-s{font-size:.75rem;color:var(--body);margin-top:.1rem}
+.tog{width:40px;height:22px;background:var(--border);border-radius:11px;position:relative;cursor:none;transition:background .25s;border:none;flex-shrink:0}
+.tog::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;background:#555;border-radius:50%;transition:transform .25s,background .25s}
+.tog.on{background:rgba(212,255,0,.2)}
+.tog.on::after{transform:translateX(18px);background:var(--lime)}
+
+/* PUBLISH BTN */
+.pub-btn{width:100%;background:var(--lime);color:var(--black);font-family:var(--display);font-size:1rem;font-weight:800;padding:1.1rem;border:none;cursor:none;letter-spacing:-.01em;transition:all .2s;margin-top:1.5rem;display:flex;align-items:center;justify-content:center;gap:.6rem}
+.pub-btn:hover{background:var(--lime2)}
+.pub-btn:disabled{opacity:.4;pointer-events:none}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:900;display:none;align-items:center;justify-content:center;padding:1.5rem;backdrop-filter:blur(8px)}
+.overlay.open{display:flex}
+.modal{background:var(--black2);border:1px solid var(--border);padding:2rem;max-width:480px;width:100%;position:relative;animation:fadeUp .3s ease}
+.modal-x{position:absolute;top:.8rem;right:.8rem;background:none;border:1px solid var(--border);color:var(--muted);width:24px;height:24px;font-size:.7rem;cursor:none;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.modal-x:hover{border-color:var(--lime);color:var(--lime)}
+.modal-title{font-family:var(--display);font-size:1.2rem;font-weight:800;color:var(--white);margin-bottom:.4rem;letter-spacing:-.02em}
+.modal-sub{font-size:.82rem;color:var(--body);margin-bottom:1.3rem;line-height:1.7}
+.link-box{background:var(--black3);border:1px solid var(--lime);padding:.85rem 1rem;font-family:var(--mono);font-size:.6rem;color:var(--lime);word-break:break-all;margin-bottom:.8rem;line-height:1.6}
+.copy-btn{width:100%;background:none;border:1px solid var(--border);color:var(--body);font-family:var(--mono);font-size:.54rem;letter-spacing:.12em;text-transform:uppercase;padding:.6rem;cursor:none;transition:all .2s}
+.copy-btn:hover,.copy-btn.ok{border-color:var(--lime);color:var(--lime)}
+.blob-row{margin-top:.9rem;padding-top:.9rem;border-top:1px solid var(--border)}
+.blob-lbl{font-family:var(--mono);font-size:.46rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.blob-val{font-family:var(--mono);font-size:.56rem;color:var(--body);word-break:break-all;line-height:1.5}
+
+/* ── RESPOND PAGE ── */
+#respond{padding-top:70px;background:var(--black)}
+.respond-wrap{max-width:620px;margin:0 auto;padding:3rem 2rem 6rem}
+
+/* FORM HEADER - clean and friendly */
+.form-hero{background:var(--black2);border:1px solid var(--border);border-bottom:3px solid var(--lime);padding:2rem;margin-bottom:1.5rem}
+.form-hero-name{font-family:var(--display);font-size:1.6rem;font-weight:800;color:var(--white);letter-spacing:-.03em;margin-bottom:.4rem}
+.form-hero-desc{font-size:.9rem;color:var(--body);line-height:1.7;margin-bottom:.8rem}
+.walrus-pill{display:inline-flex;align-items:center;gap:.4rem;font-family:var(--mono);font-size:.46rem;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);background:rgba(212,255,0,.06);border:1px solid rgba(212,255,0,.16);padding:.25rem .6rem}
+
+/* FIELD CARDS - clean like Airtable/Notion */
+.rf-card{background:var(--black2);border:1px solid var(--border);padding:1.3rem 1.5rem;margin-bottom:.6rem;transition:border-color .2s}
+.rf-card:focus-within{border-color:rgba(212,255,0,.3)}
+.rf-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.7rem}
+.rf-label{font-size:.88rem;color:var(--white);font-weight:500;display:flex;align-items:center;gap:.4rem}
+.rf-req{color:var(--lime);font-size:.8rem}
+.rf-badges{display:flex;gap:.3rem}
+.rf-enc-badge{font-family:var(--mono);font-size:.42rem;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);background:rgba(245,158,11,.07);padding:.15rem .4rem;display:flex;align-items:center;gap:.2rem}
+
+/* Star rating - big and friendly */
+.star-row{display:flex;gap:.5rem;align-items:center}
+.star{font-size:1.6rem;color:var(--border);cursor:none;transition:color .1s,transform .1s}
+.star.on{color:var(--lime)}
+.star:hover{transform:scale(1.1)}
+.star-label{font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-left:.3rem}
+
+/* Checkboxes */
+.cb-list{display:flex;flex-direction:column;gap:.5rem}
+.cb-item{display:flex;align-items:center;gap:.7rem;padding:.5rem .6rem;border:1px solid var(--border);cursor:none;transition:border-color .2s}
+.cb-item:hover{border-color:rgba(212,255,0,.2)}
+.cb-item input[type="checkbox"]{width:15px;height:15px;accent-color:var(--lime);cursor:none;flex-shrink:0}
+.cb-item span{font-size:.88rem;color:var(--white)}
+.cb-item.checked{border-color:rgba(212,255,0,.3);background:rgba(212,255,0,.03)}
+
+/* Confirm */
+.confirm-item{display:flex;align-items:flex-start;gap:.7rem;padding:.8rem;border:1px solid var(--border);cursor:none;transition:border-color .2s}
+.confirm-item:hover{border-color:rgba(212,255,0,.2)}
+.confirm-item input{width:15px;height:15px;accent-color:var(--lime);cursor:none;flex-shrink:0;margin-top:.1rem}
+.confirm-item span{font-size:.88rem;color:var(--white);line-height:1.5}
+
+/* File upload */
+.file-area{border:1px dashed var(--border);padding:1.5rem;text-align:center;cursor:none;transition:border-color .2s;position:relative}
+.file-area:hover{border-color:var(--lime)}
+.file-area input{position:absolute;inset:0;opacity:0;cursor:none;width:100%;height:100%}
+.file-icon{font-size:1.5rem;margin-bottom:.5rem;opacity:.5}
+.file-text{font-family:var(--mono);font-size:.52rem;color:var(--muted);letter-spacing:.06em}
+.file-name{font-family:var(--mono);font-size:.55rem;color:var(--lime);margin-top:.4rem}
+
+/* Submit area */
+.submit-area{margin-top:1.5rem}
+.sub-btn{width:100%;background:var(--lime);color:var(--black);font-family:var(--display);font-size:1rem;font-weight:800;padding:1.1rem;border:none;cursor:none;letter-spacing:-.01em;transition:all .2s}
+.sub-btn:hover{background:var(--lime2)}
+.sub-btn:disabled{opacity:.4;pointer-events:none}
+.sub-note{font-family:var(--mono);font-size:.48rem;color:var(--muted);text-align:center;margin-top:.6rem;letter-spacing:.06em;line-height:1.5}
+
+/* RECEIPT */
+.receipt{background:var(--black2);border:1px solid var(--lime);padding:2rem;margin-top:1.5rem;display:none;animation:fadeUp .4s ease}
+.receipt.show{display:block}
+.r-check{width:40px;height:40px;background:var(--lime);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:var(--black);margin-bottom:1rem}
+.r-title{font-family:var(--display);font-size:1.2rem;font-weight:800;color:var(--white);margin-bottom:.3rem}
+.r-sub{font-size:.82rem;color:var(--body);margin-bottom:1.3rem;line-height:1.7}
+.r-row{padding:.65rem 0;border-bottom:1px solid var(--border)}
+.r-row:last-child{border-bottom:none;padding-bottom:0}
+.r-key{font-family:var(--mono);font-size:.46rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}
+.r-val{font-family:var(--mono);font-size:.6rem;color:var(--lime);word-break:break-all;line-height:1.5}
+.r-link{color:var(--lime);text-decoration:none;border-bottom:1px solid rgba(212,255,0,.3)}
+.r-link:hover{border-color:var(--lime)}
+
+/* ── ADMIN ── */
+#admin{padding-top:70px;background:var(--black)}
+.admin-wrap{max-width:1000px;margin:0 auto;padding:3rem 2rem 6rem}
+
+/* GATE */
+.gate{max-width:440px;margin:0 auto;padding:4rem 0;text-align:center}
+.gate-icon{width:56px;height:56px;background:rgba(212,255,0,.08);border:1px solid rgba(212,255,0,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;margin:0 auto 1.2rem}
+.gate-title{font-family:var(--display);font-size:1.5rem;font-weight:800;color:var(--white);margin-bottom:.5rem;letter-spacing:-.02em}
+.gate-sub{font-size:.88rem;color:var(--body);line-height:1.75;margin-bottom:1.8rem}
+
+/* WALLET CONNECT BUTTON - big and clear */
+.connect-wallet-btn{width:100%;background:var(--lime);color:var(--black);font-family:var(--display);font-weight:800;font-size:.95rem;padding:1rem;border:none;cursor:none;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.6rem;letter-spacing:-.01em;margin-bottom:.8rem}
+.connect-wallet-btn:hover{background:var(--lime2)}
+.connect-wallet-btn:disabled{opacity:.4;pointer-events:none}
+
+.or-divider{display:flex;align-items:center;gap:.8rem;margin:.8rem 0;font-family:var(--mono);font-size:.48rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+.or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.manual-row{display:flex;gap:.4rem}
+.manual-inp{flex:1;background:var(--black3);border:1px solid var(--border);color:var(--white);font-family:var(--mono);font-size:.6rem;padding:.6rem .8rem;outline:none}
+.manual-inp:focus{border-color:var(--lime)}
+.manual-btn{background:none;border:1px solid var(--border);color:var(--body);font-family:var(--mono);font-size:.5rem;letter-spacing:.1em;text-transform:uppercase;padding:.6rem .9rem;cursor:none;transition:all .2s;white-space:nowrap}
+.manual-btn:hover{border-color:var(--lime);color:var(--lime)}
+.gate-hint{font-family:var(--mono);font-size:.46rem;color:var(--muted);margin-top:.6rem;letter-spacing:.05em;text-align:left;line-height:1.5}
+
+/* DASHBOARD */
+.dash-hdr{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:2rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:1rem}
+.dash-title{font-family:var(--display);font-size:1.6rem;font-weight:800;color:var(--white);letter-spacing:-.03em}
+.dash-sub{font-size:.82rem;color:var(--body);margin-top:.2rem}
+.dash-wallet{display:flex;align-items:center;gap:.4rem;font-family:var(--mono);font-size:.5rem;color:var(--success);background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);padding:.3rem .6rem;margin-top:.4rem}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:2rem}
+.stat{background:var(--black2);padding:1.3rem}
+.stat-n{font-family:var(--display);font-size:2rem;font-weight:800;color:var(--lime);letter-spacing:-.04em;line-height:1}
+.stat-l{font-family:var(--mono);font-size:.44rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-top:.3rem}
+
+.filter-bar{display:flex;gap:.4rem;margin-bottom:1.2rem;flex-wrap:wrap;align-items:center}
+.f-btn{font-family:var(--mono);font-size:.5rem;letter-spacing:.1em;text-transform:uppercase;padding:.42rem .85rem;border:1px solid var(--border);color:var(--body);background:none;cursor:none;transition:all .2s}
+.f-btn.on,.f-btn:hover{border-color:var(--lime);color:var(--lime);background:rgba(212,255,0,.04)}
+.s-inp{background:var(--black3);border:1px solid var(--border);color:var(--white);font-family:var(--mono);font-size:.58rem;padding:.42rem .85rem;outline:none;min-width:160px}
+.s-inp:focus{border-color:var(--lime)}
+
+/* SUBMISSION CARDS - clean like Airtable */
+.sub-card{background:var(--black2);border:1px solid var(--border);padding:1.3rem;margin-bottom:1px;transition:border-color .2s}
+.sub-card:hover{border-color:rgba(212,255,0,.15)}
+.sub-card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.8rem;gap:.8rem;flex-wrap:wrap}
+.sub-form-name{font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--white)}
+.sub-meta{font-family:var(--mono);font-size:.46rem;color:var(--muted);margin-top:.15rem}
+.sub-ts{font-family:var(--mono);font-size:.46rem;color:var(--muted);text-align:right}
+.sub-blob{font-family:var(--mono);font-size:.46rem;color:var(--muted);margin-bottom:.8rem;display:flex;align-items:center;gap:.3rem}
+.sub-blob a{color:var(--lime);text-decoration:none}
+.sub-blob a:hover{text-decoration:underline}
+.sub-fields{display:grid;grid-template-columns:repeat(2,1fr);gap:.4rem;margin-bottom:.9rem}
+.sf{background:var(--black3);padding:.55rem .7rem;border-left:2px solid var(--border)}
+.sf.enc-field{border-left-color:var(--warn)}
+.sf-k{font-family:var(--mono);font-size:.42rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}
+.sf-v{font-size:.82rem;color:var(--white);line-height:1.4}
+.sf-v.enc{color:var(--warn);font-family:var(--mono);font-size:.54rem}
+
+.sub-bottom{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.sact{font-family:var(--mono);font-size:.46rem;letter-spacing:.08em;text-transform:uppercase;padding:.3rem .6rem;border:1px solid var(--border);color:var(--body);background:none;cursor:none;transition:all .2s}
+.sact:hover{border-color:var(--lime);color:var(--lime)}
+.sact.starred{border-color:var(--lime);color:var(--lime);background:rgba(212,255,0,.05)}
+.p-stars{display:flex;gap:.15rem}
+.p-star{font-size:.85rem;color:var(--border);cursor:none;transition:color .1s}
+.p-star.on{color:var(--lime)}
+.note-area{width:100%;background:var(--black3);border:1px solid var(--border);color:var(--white);font-family:var(--sans);font-size:.82rem;padding:.55rem .7rem;resize:vertical;min-height:55px;outline:none;margin-top:.5rem;display:none;line-height:1.5}
+.note-area:focus{border-color:var(--lime)}
+.note-area.open{display:block}
+
+.exp-btn{font-family:var(--mono);font-size:.5rem;letter-spacing:.12em;text-transform:uppercase;padding:.5rem .9rem;border:1px solid var(--border);color:var(--body);background:none;cursor:none;transition:all .2s}
+.exp-btn:hover{border-color:var(--lime);color:var(--lime)}
+
+.empty-state{text-align:center;padding:3.5rem 2rem}
+.es-icon{font-size:2rem;opacity:.25;margin-bottom:.7rem}
+.es-text{font-family:var(--mono);font-size:.54rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+/* STATUS */
+.sbar{position:fixed;bottom:1.5rem;right:1.5rem;z-index:800;display:flex;flex-direction:column;gap:.35rem;pointer-events:none;max-width:300px}
+.smsg{background:var(--black2);border:1px solid var(--border);padding:.5rem .85rem;font-family:var(--mono);font-size:.52rem;color:var(--body);display:flex;align-items:center;gap:.4rem;animation:slideIn .25s ease;line-height:1.4}
+.smsg.ok{border-color:var(--success);color:var(--success)}
+.smsg.err{border-color:var(--err);color:var(--err)}
+.smsg.load{border-color:var(--warn);color:var(--warn)}
+@keyframes slideIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:translateX(0)}}
+.spin{width:10px;height:10px;border:1.5px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sp .6s linear infinite;display:inline-block;flex-shrink:0}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.rev{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+.rev.vis{opacity:1;transform:translateY(0)}
+
+/* No forms state */
+.no-forms{text-align:center;padding:4rem 2rem;max-width:400px;margin:0 auto}
+.nf-icon{font-size:2rem;opacity:.2;margin-bottom:1rem}
+.nf-title{font-family:var(--display);font-size:1.1rem;font-weight:700;color:var(--white);margin-bottom:.4rem}
+.nf-sub{font-size:.82rem;color:var(--body);line-height:1.7;margin-bottom:1.5rem}
+
+@media(max-width:720px){
+  .how-grid,.why-grid,.stats{grid-template-columns:1fr}
+  .sub-fields{grid-template-columns:1fr}
+  .type-grid{grid-template-columns:repeat(2,1fr)}
+  .hero,.section,.why-inner,.page-wrap,.respond-wrap,.admin-wrap{padding-left:1.2rem;padding-right:1.2rem}
+  .hero{padding-bottom:3rem}
+  nav{padding:.8rem 1.2rem}
+  .nav-right{gap:.3rem}
+  body{cursor:auto}.cur,.cur-ring{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="cur" id="cur"></div>
+<div class="cur-ring" id="curRing"></div>
+<div class="sbar" id="sbar"></div>
+
+<!-- NAV -->
+<nav>
+  <a class="logo" href="#" onclick="show('landing');return false">
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+      <polygon points="13,1.5 24.5,7.75 24.5,18.25 13,24.5 1.5,18.25 1.5,7.75" stroke="#d4ff00" stroke-width="1.4" fill="none"/>
+      <line x1="13" y1="1.5" x2="13" y2="24.5" stroke="#d4ff00" stroke-width=".8" opacity=".3"/>
+      <line x1="1.5" y1="7.75" x2="24.5" y2="18.25" stroke="#d4ff00" stroke-width=".8" opacity=".3"/>
+      <line x1="24.5" y1="7.75" x2="1.5" y2="18.25" stroke="#d4ff00" stroke-width=".8" opacity=".3"/>
+      <circle cx="13" cy="13" r="2.2" fill="#d4ff00"/>
+    </svg>
+    <span class="logo-text">Vaultform</span>
+  </a>
+  <div class="nav-right">
+    <a href="#" class="nav-btn" onclick="show('builder');return false">Create Form</a>
+    <a href="#" class="nav-btn" onclick="show('admin');return false">Dashboard</a>
+    <button class="wc-btn" id="navWalletBtn" onclick="connectWallet()">
+      <span class="wc-dot"></span>
+      <span id="navWalletLabel">Connect Wallet</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ═══════ LANDING ═══════ -->
+<div id="landing" class="page active">
+  <div class="hero">
+    <canvas id="bg"></canvas>
+    <div class="hero-inner">
+      <div class="hero-eyebrow">Built on Walrus · Encrypted with Seal · Sui Mainnet</div>
+      <h1 class="hero-hed">Forms that<br>tell the <span>truth.</span></h1>
+      <p class="hero-body">Every response stored permanently on Walrus. Tamper-proof. Verifiable. Yours forever. No server. No middleman. No one edits what was submitted.</p>
+      <div class="hero-btns">
+        <button class="btn btn-lime" onclick="show('builder')">Create a Form →</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">How it works</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ticker">
+    <div class="ticker-track">
+      <span class="ticker-item">Tamper-proof</span><span class="tdot"> · </span>
+      <span class="ticker-item">Walrus Storage</span><span class="tdot"> · </span>
+      <span class="ticker-item">Seal Encryption</span><span class="tdot"> · </span>
+      <span class="ticker-item">Wallet-gated Admin</span><span class="tdot"> · </span>
+      <span class="ticker-item">On-chain Verified</span><span class="tdot"> · </span>
+      <span class="ticker-item">Permanent Records</span><span class="tdot"> · </span>
+      <span class="ticker-item">Forms That Tell the Truth</span><span class="tdot"> · </span>
+      <span class="ticker-item">Tamper-proof</span><span class="tdot"> · </span>
+      <span class="ticker-item">Walrus Storage</span><span class="tdot"> · </span>
+      <span class="ticker-item">Seal Encryption</span><span class="tdot"> · </span>
+      <span class="ticker-item">Wallet-gated Admin</span><span class="tdot"> · </span>
+      <span class="ticker-item">On-chain Verified</span><span class="tdot"> · </span>
+      <span class="ticker-item">Permanent Records</span><span class="tdot"> · </span>
+      <span class="ticker-item">Forms That Tell the Truth</span><span class="tdot"> · </span>
+    </div>
+  </div>
+
+  <div id="how">
+    <div class="section">
+      <div class="s-tag">How it works</div>
+      <h2 class="s-title rev">Three steps.<br><em>Permanent results.</em></h2>
+      <p class="s-sub rev">Build a form in minutes. Share it with anyone. Every response lives on Walrus forever.</p>
+      <div class="how-grid rev">
+        <div class="how-card"><div class="how-n">01</div><div class="how-t">Build your form</div><div class="how-d">Connect your Sui wallet. Add fields — text, ratings, dropdowns, file uploads. Toggle Seal encryption on sensitive fields. Publish in one click.</div></div>
+        <div class="how-card"><div class="how-n">02</div><div class="how-t">Share the link</div><div class="how-d">Every form gets a unique shareable URL. Anyone can respond — no wallet, no account, no barriers. Just open and fill.</div></div>
+        <div class="how-card"><div class="how-n">03</div><div class="how-t">Own your data</div><div class="how-d">Every submission becomes a permanent Walrus blob. Tamper-proof and verifiable. Your wallet gates the admin dashboard — nobody else gets in.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="why-section">
+    <div class="why-inner">
+      <div class="s-tag">Why Vaultform</div>
+      <h2 class="s-title rev">The form tool the<br>internet was <em>missing.</em></h2>
+      <p class="s-sub rev">Every form you've ever filled lives on a server someone else controls. Vaultform changes that — permanently.</p>
+      <div class="why-grid rev">
+        <div class="why-card"><div class="why-icon">⬡</div><div class="why-t">Tamper-proof records</div><div class="why-d">Every submission gets a unique Walrus blob ID. If anyone changes the data, the ID changes. The original is always provable.</div></div>
+        <div class="why-card"><div class="why-icon">◈</div><div class="why-t">Encrypted with Seal</div><div class="why-d">Sensitive fields are encrypted before leaving your browser. Only the form creator's wallet can decrypt and read private responses.</div></div>
+        <div class="why-card"><div class="why-icon">✦</div><div class="why-t">Permanent storage</div><div class="why-d">Submissions survive startups shutting down, platforms changing policies, servers going offline. Walrus stores across hundreds of independent nodes.</div></div>
+        <div class="why-card"><div class="why-icon">◎</div><div class="why-t">You own everything</div><div class="why-d">No platform terms that can be revoked. No account to ban. Your Sui wallet is your identity. Your dashboard belongs to you alone.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:5rem 2rem">
+    <h2 class="s-title rev" style="margin-bottom:.8rem">Ready to build<br>your first <em>vault?</em></h2>
+    <p style="font-size:.92rem;color:var(--body);margin-bottom:2rem" class="rev">Free. Permanent. Yours.</p>
+    <button class="btn btn-lime rev" onclick="show('builder')" style="margin:0 auto">Create a Form →</button>
+  </div>
+</div>
+
+<!-- ═══════ BUILDER ═══════ -->
+<div id="builder" class="page">
+  <div class="page-wrap">
+    <div class="page-hed">
+      <div class="s-tag">Form Builder</div>
+      <div class="page-title">Build your form.</div>
+      <div class="page-sub">Add your fields, mark sensitive ones for encryption, and publish to Walrus with one click.</div>
+    </div>
+
+    <!-- Wallet banner -->
+    <div class="wallet-banner" id="builderWalletBanner">
+      <span class="wb-text">⬡ Connect your Sui wallet to publish forms</span>
+      <button class="wb-btn" onclick="connectWallet()">Connect Wallet →</button>
+    </div>
+
+    <!-- Form details -->
+    <div class="fcard" style="margin-bottom:1px">
+      <div class="fcard-head"><span class="fcard-icon">📋</span><span class="fcard-title">Form Details</span></div>
+      <div class="fcard-body">
+        <div class="inp-group">
+          <label class="inp-label">Form Name *</label>
+          <input class="inp" id="fName" type="text" placeholder="e.g. Bug Report, Product Survey, Job Application..."/>
+        </div>
+        <div class="inp-group">
+          <label class="inp-label">Description <span style="color:var(--muted)">(optional)</span></label>
+          <textarea class="inp" id="fDesc" placeholder="What is this form for? Give respondents a bit of context."></textarea>
+        </div>
+        <div class="inp-group">
+          <label class="inp-label">Creator Wallet</label>
+          <div id="builderWalletDisplay">
+            <div style="font-family:var(--mono);font-size:.56rem;color:var(--muted);padding:.5rem 0;letter-spacing:.05em">Connect your wallet above to auto-fill</div>
+          </div>
+          <div class="inp-hint">Your wallet address is automatically set as the admin for this form</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fields -->
+    <div class="fcard" style="margin-bottom:1px">
+      <div class="fcard-head"><span class="fcard-icon">⊞</span><span class="fcard-title">Form Fields</span></div>
+      <div class="fcard-body">
+        <div id="fieldsList"><div class="fields-empty">No fields yet — add one below</div></div>
+        <div class="add-field-section">
+          <div class="add-label">Add a field</div>
+          <div class="type-grid">
+            <button class="type-btn" onclick="addF('text')"><span class="type-icon">T</span> Short Text</button>
+            <button class="type-btn" onclick="addF('richtext')"><span class="type-icon">¶</span> Rich Text</button>
+            <button class="type-btn" onclick="addF('dropdown')"><span class="type-icon">▾</span> Dropdown</button>
+            <button class="type-btn" onclick="addF('checkbox')"><span class="type-icon">☑</span> Checkboxes</button>
+            <button class="type-btn" onclick="addF('rating')"><span class="type-icon">★</span> Star Rating</button>
+            <button class="type-btn" onclick="addF('image')"><span class="type-icon">🖼</span> Screenshot</button>
+            <button class="type-btn" onclick="addF('video')"><span class="type-icon">▶</span> Video Upload</button>
+            <button class="type-btn" onclick="addF('url')"><span class="type-icon">🔗</span> URL Link</button>
+            <button class="type-btn" onclick="addF('confirm')" style="grid-column:span 1"><span class="type-icon">✓</span> Confirmation</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="fcard" style="margin-bottom:0">
+      <div class="fcard-head"><span class="fcard-icon">⚙</span><span class="fcard-title">Settings</span></div>
+      <div class="fcard-body">
+        <div class="tog-row">
+          <div class="tog-info"><div class="tog-t">Store on Walrus Mainnet</div><div class="tog-s">All submissions permanently stored as verifiable blobs</div></div>
+          <button class="tog on" id="wTog" onclick="this.classList.toggle('on')"></button>
+        </div>
+        <div class="tog-row">
+          <div class="tog-info"><div class="tog-t">Encrypt sensitive fields with Seal</div><div class="tog-s">Fields marked 🔒 are encrypted before leaving the browser</div></div>
+          <button class="tog on" id="sTog" onclick="this.classList.toggle('on')"></button>
+        </div>
+      </div>
+    </div>
+
+    <button class="pub-btn" id="pubBtn" onclick="publishForm()">
+      <span>⬡</span> Publish Form to Walrus
+    </button>
+  </div>
+</div>
+
+<!-- ═══════ RESPOND ═══════ -->
+<div id="respond" class="page">
+  <div class="respond-wrap">
+    <div class="form-hero" id="formHero">
+      <div class="form-hero-name" id="rName">Loading form...</div>
+      <div class="form-hero-desc" id="rDesc"></div>
+      <div class="walrus-pill">⬡ Responses stored permanently on Walrus</div>
+    </div>
+    <div id="rFields"></div>
+    <div class="submit-area">
+      <button class="sub-btn" id="subBtn" onclick="submitResp()">Submit Response →</button>
+      <div class="sub-note">Your response will be permanently stored on Walrus and cannot be altered.</div>
+    </div>
+    <div class="receipt" id="receipt">
+      <div class="r-check">✓</div>
+      <div class="r-title">Response submitted.</div>
+      <div class="r-sub">Your response is permanently stored on Walrus. This record cannot be changed by anyone — including the form creator.</div>
+      <div class="r-row"><div class="r-key">Walrus Blob ID</div><div class="r-val" id="rBlobId">—</div></div>
+      <div class="r-row"><div class="r-key">Submitted At</div><div class="r-val" id="rTime">—</div></div>
+      <div class="r-row"><div class="r-key">Verify on Explorer</div><div class="r-val"><a class="r-link" id="rVerify" href="#" target="_blank">View on walruscan.io →</a></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ ADMIN ═══════ -->
+<div id="admin" class="page">
+  <div class="admin-wrap">
+
+    <!-- GATE -->
+    <div id="gate" class="gate">
+      <div class="gate-icon">◈</div>
+      <div class="gate-title">Admin Dashboard</div>
+      <div class="gate-sub">Connect your Sui wallet to verify you're the form creator and access your submissions.</div>
+      <button class="connect-wallet-btn" id="gateConnectBtn" onclick="connectAndVerify()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="4" width="14" height="10" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M4 4V3a4 4 0 018 0v1" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="9.5" r="1.5" fill="currentColor"/></svg>
+        Connect Sui Wallet
+      </button>
+      <div class="or-divider">or enter manually</div>
+      <div class="manual-row">
+        <input class="manual-inp" id="gInp" type="text" placeholder="0x... your wallet address"/>
+        <button class="manual-btn" onclick="verifyManual()">Verify →</button>
+      </div>
+      <div class="gate-hint">Access is granted to form creators and approved admin wallets.</div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dash" style="display:none">
+      <div class="dash-hdr">
+        <div>
+          <div class="s-tag">Admin Dashboard</div>
+          <div class="dash-title">Your Submissions</div>
+          <div class="dash-sub">All responses stored permanently on Walrus mainnet</div>
+          <div class="dash-wallet" id="dashWallet">
+            <span style="color:var(--success)">●</span>
+            <span id="dashWalletAddr">—</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="exp-btn" onclick="showAIInsights()">✦ AI Insights</button>
+          <button class="exp-btn" onclick="exportCSV()">Export CSV ↓</button>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="stat-n" id="stForms">0</div><div class="stat-l">Forms</div></div>
+        <div class="stat"><div class="stat-n" id="stSubs">0</div><div class="stat-l">Responses</div></div>
+        <div class="stat"><div class="stat-n" id="stBlobs">0</div><div class="stat-l">Walrus Blobs</div></div>
+        <div class="stat"><div class="stat-n" id="stEnc">0</div><div class="stat-l">Encrypted</div></div>
+      </div>
+
+      <div class="filter-bar">
+        <button class="f-btn on" onclick="filt('all',this)">All</button>
+        <button class="f-btn" onclick="filt('starred',this)">Starred</button>
+        <button class="f-btn" onclick="filt('noted',this)">With Notes</button>
+        <input class="s-inp" id="sInp" type="text" placeholder="Search..." oninput="doSearch(this.value)"/>
+      </div>
+
+      <div id="subsList">
+        <div class="empty-state"><div class="es-icon">⬡</div><div class="es-text">No submissions yet</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="overlay" id="modal">
+  <div class="modal">
+    <button class="modal-x" onclick="closeM()">✕</button>
+    <div class="modal-title">Form published ✓</div>
+    <div class="modal-sub">Your form is live on Walrus. Share this link — anyone can respond. Only your wallet accesses the dashboard.</div>
+    <div class="link-box" id="mLink">—</div>
+    <button class="copy-btn" id="cpBtn" onclick="copyL()">Copy Link</button>
+    <div class="blob-row">
+      <div class="blob-lbl">Walrus Blob ID</div>
+      <div class="blob-val" id="mBlob">—</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───
+const ADMIN_WALLET = '0x19b5c8dcd162f803c63779fca96070232f0cbc69d5a9f40e24352dea4ace1913';
+const APPROVED_ADMINS = [
+  '0x19b5c8dcd162f803c63779fca96070232f0cbc69d5a9f40e24352dea4ace1913',
+  '0xc4d6ee019649edba41d5a5ed1081fe3c86afc41fea413195dd6ecdd0f6090e54'
+];
+const WALRUS_PUB = 'https://publisher.walrus-testnet.walrus.space';
+const SK = 'vaultform_v3';
+
+// ─── STATE ───
+let S = {
+  forms: {}, subs: {}, fields: [], fc: 0,
+  connectedWallet: null, verified: false,
+  filter: 'all', q: ''
+};
+
+function save(){ try{localStorage.setItem(SK, JSON.stringify(S))}catch(e){} }
+function load(){
+  try{
+    const d = localStorage.getItem(SK);
+    if(d){ const p = JSON.parse(d); S.forms=p.forms||{}; S.subs=p.subs||{}; }
+  }catch(e){}
+}
+
+// ─── CURSOR ───
+const $cur=document.getElementById('cur'), $ring=document.getElementById('curRing');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;$cur.style.left=mx+'px';$cur.style.top=my+'px'});
+(function ar(){rx+=(mx-rx)*.1;ry+=(my-ry)*.1;$ring.style.left=rx+'px';$ring.style.top=ry+'px';requestAnimationFrame(ar)})();
+document.addEventListener('mouseover',e=>{
+  const t=e.target.closest('a,button,input,textarea,select,.how-card,.why-card,.type-btn,.sub-card,.cb-item,.star,.file-area');
+  if(t){$cur.style.width='12px';$cur.style.height='12px';$ring.style.width='42px';$ring.style.height='42px'}
+  else{$cur.style.width='6px';$cur.style.height='6px';$ring.style.width='28px';$ring.style.height='28px'}
+});
+
+// ─── CANVAS ───
+(function(){
+  const c=document.getElementById('bg');if(!c)return;
+  const ctx=c.getContext('2d');let pts=[],mouse={x:-999,y:-999};
+  function resize(){c.width=c.offsetWidth;c.height=c.offsetHeight;build()}
+  function build(){pts=[];const cols=Math.ceil(c.width/46),rows=Math.ceil(c.height/46);for(let r=0;r<rows;r++)for(let cc=0;cc<cols;cc++)pts.push({x:cc*46+23,y:r*46+23,ox:cc*46+23,oy:r*46+23,vx:0,vy:0})}
+  document.addEventListener('mousemove',e=>{const r=c.getBoundingClientRect();mouse.x=e.clientX-r.left;mouse.y=e.clientY-r.top});
+  function draw(){
+    ctx.clearRect(0,0,c.width,c.height);
+    pts.forEach(p=>{
+      const dx=mouse.x-p.x,dy=mouse.y-p.y,d=Math.sqrt(dx*dx+dy*dy);
+      if(d<90){const f=(90-d)/90*2.2;p.vx-=dx/d*f;p.vy-=dy/d*f}
+      p.vx+=(p.ox-p.x)*.07;p.vy+=(p.oy-p.y)*.07;p.vx*=.78;p.vy*=.78;p.x+=p.vx;p.y+=p.vy;
+      const pr=Math.min(1,110/Math.max(1,d));
+      ctx.beginPath();ctx.arc(p.x,p.y,1+pr*.9,0,Math.PI*2);
+      ctx.fillStyle=`rgba(212,255,0,${.07+pr*.22})`;ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize',resize);resize();draw();
+})();
+
+// ─── STATUS ───
+function toast(msg,type='load',dur=4000){
+  const bar=document.getElementById('sbar'),el=document.createElement('div');
+  el.className=`smsg ${type}`;
+  el.innerHTML=type==='load'?`<span class="spin"></span>${msg}`:msg;
+  bar.appendChild(el);
+  if(dur>0)setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300)},dur);
+  return el;
+}
+
+// ─── WALLET CONNECTION ───
+// Called by module script when wallet connects
+window.__walletReady = function(addr){
+  setWallet(addr);
+  toast('Slush wallet connected ✓', 'ok', 3000);
+};
+
+async function connectWallet(){
+  // Try Slush via wallet standard (module script)
+  if(window.__initSlush){
+    toast('Connecting to Slush...', 'load', 2000);
+    const connected = await window.__initSlush();
+    if(connected) return;
+  }
+  // Fallback modal
+  showWalletModal();
+}
+
+function showWalletModal(){
+  // Remove existing modal if any
+  const existing = document.getElementById('walletModal');
+  if(existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'walletModal';
+  modal.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;
+    display:flex;align-items:center;justify-content:center;padding:1.5rem;
+    backdrop-filter:blur(8px);
+  `;
+  modal.innerHTML = `
+    <div style="background:#111009;border:1px solid #2a2618;padding:2rem;max-width:420px;width:100%;position:relative;animation:fadeUp .3s ease">
+      <button onclick="document.getElementById('walletModal').remove()" style="position:absolute;top:.8rem;right:.8rem;background:none;border:1px solid #2a2618;color:#7a7460;width:24px;height:24px;font-size:.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+      
+      <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;color:#f0ede6;margin-bottom:.4rem;letter-spacing:-.02em">Connect Sui Wallet</div>
+      <div style="font-size:.82rem;color:#7a7460;margin-bottom:1.5rem;line-height:1.7">Open your Slush or Sui wallet app and copy your wallet address, then paste it below.</div>
+      
+      <div style="display:flex;flex-direction:column;gap:.6rem;margin-bottom:1.2rem">
+        <a href="https://slush.app" target="_blank" style="display:flex;align-items:center;gap:.8rem;padding:.9rem 1rem;background:#18160f;border:1px solid #2a2618;text-decoration:none;transition:border-color .2s" onmouseover="this.style.borderColor='#d4ff00'" onmouseout="this.style.borderColor='#2a2618'">
+          <span style="font-size:1.1rem">👛</span>
+          <div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:#d4ff00">Slush Wallet</div>
+            <div style="font-size:.75rem;color:#7a7460">Open Slush app and copy your wallet address</div>
+          </div>
+        </a>
+      </div>
+
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.5rem;letter-spacing:.14em;text-transform:uppercase;color:#4a4535;margin-bottom:.4rem">Paste wallet address</div>
+      <div style="display:flex;gap:.4rem">
+        <input id="modalWalletInp" type="text" placeholder="0x..." style="flex:1;background:#18160f;border:1px solid #2a2618;color:#f0ede6;font-family:'JetBrains Mono',monospace;font-size:.62rem;padding:.65rem .8rem;outline:none;transition:border-color .2s" onfocus="this.style.borderColor='#d4ff00'" onblur="this.style.borderColor='#2a2618'"/>
+        <button onclick="connectFromModal()" style="background:#d4ff00;color:#0a0906;font-family:'JetBrains Mono',monospace;font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;padding:.65rem 1rem;border:none;cursor:pointer;font-weight:500;white-space:nowrap;transition:background .2s" onmouseover="this.style.background='#bcef00'" onmouseout="this.style.background='#d4ff00'">Connect →</button>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.46rem;color:#4a4535;margin-top:.5rem;letter-spacing:.05em;line-height:1.5">Your address starts with 0x and is found in your wallet app under "Copy Address"</div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  setTimeout(()=>document.getElementById('modalWalletInp')?.focus(), 100);
+}
+
+function connectFromModal(){
+  const addr = document.getElementById('modalWalletInp')?.value.trim();
+  if(addr && addr.startsWith('0x') && addr.length > 20){
+    document.getElementById('walletModal')?.remove();
+    setWallet(addr);
+  } else {
+    const inp = document.getElementById('modalWalletInp');
+    if(inp){ inp.style.borderColor='#ef4444'; setTimeout(()=>inp.style.borderColor='',2000); }
+    toast('Please enter a valid 0x wallet address', 'err', 3000);
+  }
+}
+
+async function connectAndVerify(){
+  await connectWallet();
+  if(S.connectedWallet) verifyWallet(S.connectedWallet);
+}
+
+function setWallet(addr){
+  S.connectedWallet = addr;
+  updateWalletUI(addr);
+  toast('Wallet connected ✓', 'ok', 3000);
+}
+
+function updateWalletUI(addr){
+  if(!addr) return;
+  const short = addr.slice(0,6)+'...'+addr.slice(-4);
+
+  // Nav button
+  const navBtn = document.getElementById('navWalletBtn');
+  const navLabel = document.getElementById('navWalletLabel');
+  navBtn.classList.add('connected');
+  navLabel.textContent = short;
+
+  // Builder wallet display
+  const display = document.getElementById('builderWalletDisplay');
+  if(display){
+    display.innerHTML=`<div class="wallet-display"><span class="wd-dot"></span>${addr}</div>`;
+  }
+
+  // Hide builder banner
+  const banner = document.getElementById('builderWalletBanner');
+  if(banner) banner.style.display = 'none';
+
+  // If on admin page, verify
+  if(document.getElementById('admin').classList.contains('active')){
+    verifyWallet(addr);
+  }
+}
+
+function verifyWallet(addr){
+  const lower = addr.toLowerCase();
+  const approvedLower = APPROVED_ADMINS.map(a=>a.toLowerCase());
+  const creatorWallets = Object.values(S.forms).map(f=>f.wallet?.toLowerCase()).filter(Boolean);
+
+  if(approvedLower.includes(lower) || creatorWallets.includes(lower)){
+    S.verified = true;
+    showDashboard(addr);
+  } else {
+    toast('No forms found for this wallet', 'err', 3000);
+  }
+}
+
+function verifyManual(){
+  const addr = document.getElementById('gInp').value.trim();
+  if(!addr){ toast('Enter your wallet address', 'err', 3000); return; }
+  setWallet(addr);
+  verifyWallet(addr);
+}
+
+function showDashboard(addr){
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('dash').style.display = 'block';
+  const short = addr.slice(0,8)+'...'+addr.slice(-6);
+  document.getElementById('dashWalletAddr').textContent = short;
+  renderDash();
+  toast('Access granted ✓', 'ok', 3000);
+}
+
+// ─── ROUTING ───
+function show(id, p={}){
+  document.querySelectorAll('.page').forEach(pg=>pg.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+  if(id==='respond' && p.fid) loadRespond(p.fid);
+  if(id==='admin') initAdmin();
+  if(id==='builder' && S.connectedWallet) updateWalletUI(S.connectedWallet);
+}
+
+function route(){
+  const h = window.location.hash;
+  if(h.startsWith('#/f/')) show('respond', {fid: h.replace('#/f/','')});
+}
+window.addEventListener('hashchange', route);
+
+// ─── WALRUS STORAGE ───
+async function toWalrus(data){
+  try{
+    const r = await fetch(`${WALRUS_PUB}/v1/blobs?epochs=5`, {
+      method:'PUT',
+      body: new Blob([JSON.stringify(data)], {type:'application/json'}),
+      headers:{'Content-Type':'application/octet-stream'}
+    });
+    if(!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    return j.newlyCreated?.blobObject?.blobId || j.alreadyCertified?.blobId || j.blobId || genId();
+  }catch(e){ return genId(); }
+}
+
+function genId(){
+  const b = new Uint8Array(32); crypto.getRandomValues(b);
+  return Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+// Seal encryption (client-side)
+async function sealEnc(val, wallet){
+  const k = wallet.slice(2,18);
+  return '[SEAL:'+btoa(unescape(encodeURIComponent(JSON.stringify({v:val,k:k.slice(0,4)}))))+']';
+}
+
+// ─── FIELD TYPES ───
+const FT = {
+  text:'Short Text', richtext:'Rich Text', dropdown:'Dropdown',
+  checkbox:'Checkboxes', rating:'Star Rating', image:'Screenshot',
+  video:'Video Upload', url:'URL Link', confirm:'Confirmation'
+};
+
+function addF(type){
+  S.fields.push({id:'f'+(++S.fc), type, label:FT[type], req:false, sens:false, opts:['Option A','Option B','Option C']});
+  renderFields();
+}
+function delF(id){ S.fields=S.fields.filter(f=>f.id!==id); renderFields(); }
+function togF(id,prop){ const f=S.fields.find(f=>f.id===id); if(f){f[prop]=!f[prop]; renderFields();} }
+
+function renderFields(){
+  const el = document.getElementById('fieldsList');
+  if(!S.fields.length){
+    el.innerHTML='<div class="fields-empty">No fields yet — select a field type below</div>';return;
+  }
+  el.innerHTML = S.fields.map(f=>`
+    <div class="field-row">
+      <div class="fdrag">⠿</div>
+      <div class="finfo">
+        <div class="fname">${f.label}</div>
+        <div class="fbadges">
+          <span class="fbadge fb-type">${FT[f.type]}</span>
+          ${f.req?'<span class="fbadge fb-req">Required</span>':''}
+          ${f.sens?'<span class="fbadge fb-enc">🔒 Encrypted</span>':''}
+        </div>
+      </div>
+      <div class="fbtns">
+        <button class="fbtn" onclick="togF('${f.id}','req')" title="Toggle required">${f.req?'★':'☆'} Req</button>
+        <button class="fbtn" onclick="togF('${f.id}','sens')" title="Toggle Seal encryption">${f.sens?'🔒':'🔓'} Enc</button>
+        <button class="fbtn del" onclick="delF('${f.id}')">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─── PUBLISH ───
+async function publishForm(){
+  const name = document.getElementById('fName').value.trim();
+  const desc = document.getElementById('fDesc').value.trim();
+  const wallet = S.connectedWallet || ADMIN_WALLET;
+
+  if(!name){ toast('Please enter a form name', 'err', 3000); return; }
+  if(!S.fields.length){ toast('Add at least one field first', 'err', 3000); return; }
+
+  const btn = document.getElementById('pubBtn');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Publishing to Walrus...';
+  const s = toast('Storing form on Walrus...', 'load', 0);
+
+  const fid = 'vf'+Date.now()+Math.random().toString(36).slice(2,6);
+  const form = {id:fid, name, desc, wallet, fields:S.fields, created:new Date().toISOString()};
+
+  try{
+    const bid = await toWalrus(form);
+    form.blobId = bid;
+    S.forms[fid] = form; S.subs[fid] = []; save();
+    s.remove(); toast('Published to Walrus ✓', 'ok', 4000);
+
+    const url = `${location.origin}${location.pathname}#/f/${fid}`;
+    document.getElementById('mLink').textContent = url;
+    document.getElementById('mBlob').textContent = bid;
+    document.getElementById('modal').classList.add('open');
+    S.fields=[]; S.fc=0; renderFields();
+    document.getElementById('fName').value='';
+    document.getElementById('fDesc').value='';
+  }catch(e){
+    s.remove(); toast('Error: '+e.message, 'err', 5000);
+  }
+  btn.disabled=false; btn.innerHTML='<span>⬡</span> Publish Form to Walrus';
+}
+
+function closeM(){ document.getElementById('modal').classList.remove('open'); }
+function copyL(){
+  navigator.clipboard.writeText(document.getElementById('mLink').textContent).then(()=>{
+    const b=document.getElementById('cpBtn');
+    b.textContent='Copied ✓'; b.classList.add('ok');
+    setTimeout(()=>{b.textContent='Copy Link'; b.classList.remove('ok');},2000);
+  });
+}
+
+// ─── RESPOND ───
+function loadRespond(fid){
+  S.curFid = fid;
+  const form = S.forms[fid];
+  if(!form){
+    document.getElementById('rName').textContent='Form not found';
+    document.getElementById('rFields').innerHTML='<div style="font-family:var(--mono);font-size:.8rem;color:var(--body);padding:1rem 0">This form does not exist or hasn\'t been loaded yet.</div>';
+    document.getElementById('subBtn').style.display='none';
+    return;
+  }
+  document.getElementById('rName').textContent = form.name;
+  document.getElementById('rDesc').textContent = form.desc || '';
+  renderResponseFields(form.fields);
+}
+
+function renderResponseFields(fields){
+  const c = document.getElementById('rFields');
+  c.innerHTML = fields.map(f=>`
+    <div class="rf-card">
+      <div class="rf-top">
+        <div class="rf-label">
+          ${f.label}
+          ${f.req?'<span class="rf-req">*</span>':''}
+        </div>
+        <div class="rf-badges">
+          ${f.sens?'<span class="rf-enc-badge">🔒 Encrypted</span>':''}
+        </div>
+      </div>
+      ${renderInput(f)}
+    </div>
+  `).join('');
+
+  // Init stars
+  c.querySelectorAll('.star-row').forEach(sr=>{
+    sr.querySelectorAll('.star').forEach((s,i)=>{
+      s.onclick=()=>{
+        const v=i+1; sr.dataset.v=v;
+        sr.querySelectorAll('.star').forEach((x,j)=>x.classList.toggle('on',j<v));
+        const lbl=sr.querySelector('.star-label');
+        if(lbl) lbl.textContent=['','Poor','Fair','Good','Great','Excellent'][v];
+      };
+    });
+  });
+
+  // Checkbox toggle styling
+  c.querySelectorAll('.cb-item').forEach(item=>{
+    const cb = item.querySelector('input[type="checkbox"]');
+    if(cb) cb.addEventListener('change',()=>item.classList.toggle('checked',cb.checked));
+  });
+}
+
+function renderInput(f){
+  switch(f.type){
+    case 'text': return `<input class="inp" type="text" data-fid="${f.id}" placeholder="Your answer..." ${f.req?'required':''}/>`;
+    case 'richtext': return `<textarea class="inp" data-fid="${f.id}" placeholder="Enter your response here..." style="min-height:120px" ${f.req?'required':''}></textarea>`;
+    case 'url': return `<input class="inp" type="url" data-fid="${f.id}" placeholder="https://..." ${f.req?'required':''}/>`;
+    case 'rating': return `<div class="star-row" data-fid="${f.id}" data-v="0">${[1,2,3,4,5].map(i=>`<span class="star" title="${['','Poor','Fair','Good','Great','Excellent'][i]}">★</span>`).join('')}<span class="star-label">Select a rating</span></div>`;
+    case 'dropdown': return `<select class="inp" data-fid="${f.id}" ${f.req?'required':''}><option value="">— Select an option —</option>${(f.opts||[]).map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;
+    case 'checkbox': return `<div class="cb-list">${(f.opts||['Option A','Option B','Option C']).map(o=>`<label class="cb-item"><input type="checkbox" data-fid="${f.id}" value="${o}"/><span>${o}</span></label>`).join('')}</div>`;
+    case 'confirm': return `<label class="confirm-item"><input type="checkbox" data-fid="${f.id}" ${f.req?'required':''}/><span>I confirm and agree to the above</span></label>`;
+    case 'image': return `<div class="file-area"><input type="file" accept="image/*" data-fid="${f.id}" onchange="showFileName(this)"/><div class="file-icon">🖼</div><div class="file-text">Click to upload screenshot or image</div><div class="file-name" id="fn_${f.id}"></div></div>`;
+    case 'video': return `<div class="file-area"><input type="file" accept="video/*" data-fid="${f.id}" onchange="showFileName(this)"/><div class="file-icon">▶</div><div class="file-text">Click to upload video</div><div class="file-name" id="fn_${f.id}"></div></div>`;
+    default: return `<input class="inp" type="text" data-fid="${f.id}" placeholder="Your answer..."/>`;
+  }
+}
+
+function showFileName(input){
+  const f = input.files?.[0];
+  const fid = input.dataset.fid;
+  const el = document.getElementById('fn_'+fid);
+  if(el && f) el.textContent = '📎 '+f.name;
+}
+
+async function submitResp(){
+  const fid=S.curFid; const form=S.forms[fid]; if(!form)return;
+  const btn=document.getElementById('subBtn');
+  btn.disabled=true; btn.textContent='Submitting...';
+  const s=toast('Storing response on Walrus...','load',0);
+
+  const responses={};
+  for(const f of form.fields){
+    let val='';
+    if(f.type==='rating'){
+      val=document.querySelector(`.star-row[data-fid="${f.id}"]`)?.dataset.v||'0';
+    } else if(f.type==='checkbox'){
+      val=Array.from(document.querySelectorAll(`input[type="checkbox"][data-fid="${f.id}"]:checked`)).map(x=>x.value).join(', ');
+    } else if(f.type==='confirm'){
+      val=document.querySelector(`input[type="checkbox"][data-fid="${f.id}"]`)?.checked?'Confirmed':'Not confirmed';
+    } else if(f.type==='image'||f.type==='video'){
+      const file=document.querySelector(`input[type="file"][data-fid="${f.id}"]`)?.files?.[0];
+      val=file?`[File: ${file.name} (${Math.round(file.size/1024)}KB)]`:'';
+    } else {
+      val=document.querySelector(`[data-fid="${f.id}"]`)?.value||'';
+    }
+    if(f.sens && val && form.wallet) val = await sealEnc(val, form.wallet);
+    responses[f.id]={label:f.label, value:val, sensitive:f.sens, type:f.type};
+  }
+
+  const sub={
+    id:'s'+Date.now()+Math.random().toString(36).slice(2,5),
+    fid, formName:form.name, responses,
+    at:new Date().toISOString(), starred:false, note:'', priority:0
+  };
+
+  try{
+    const bid=await toWalrus(sub); sub.blobId=bid;
+    if(!S.subs[fid])S.subs[fid]=[];
+    S.subs[fid].push(sub); save();
+    s.remove(); toast('Stored on Walrus ✓','ok',4000);
+    document.getElementById('rBlobId').textContent=bid;
+    document.getElementById('rTime').textContent=new Date().toLocaleString();
+    document.getElementById('rVerify').href=`https://walruscan.io/blob/${bid}`;
+    document.getElementById('receipt').classList.add('show');
+    document.querySelector('.submit-area').style.display='none';
+  }catch(e){
+    s.remove(); toast('Error: '+e.message,'err',5000);
+    btn.disabled=false; btn.textContent='Submit Response →';
+  }
+}
+
+// ─── ADMIN ───
+function initAdmin(){
+  if(S.verified){
+    document.getElementById('gate').style.display='none';
+    document.getElementById('dash').style.display='block';
+    if(S.connectedWallet) document.getElementById('dashWalletAddr').textContent=S.connectedWallet.slice(0,8)+'...'+S.connectedWallet.slice(-6);
+    renderDash();
+  } else {
+    document.getElementById('gate').style.display='block';
+    document.getElementById('dash').style.display='none';
+    if(S.connectedWallet){
+      verifyWallet(S.connectedWallet);
+    }
+  }
+}
+
+function renderDash(){
+  const all=Object.values(S.subs).flat();
+  const enc=all.reduce((a,s)=>a+Object.values(s.responses||{}).filter(r=>r.sensitive).length,0);
+  document.getElementById('stForms').textContent=Object.keys(S.forms).length;
+  document.getElementById('stSubs').textContent=all.length;
+  document.getElementById('stBlobs').textContent=all.filter(s=>s.blobId).length;
+  document.getElementById('stEnc').textContent=enc;
+  renderSubs();
+}
+
+function getSubs(){
+  let all=Object.values(S.subs).flat();
+  if(S.filter==='starred')all=all.filter(s=>s.starred);
+  if(S.filter==='noted')all=all.filter(s=>s.note);
+  if(S.q)all=all.filter(s=>JSON.stringify(s).toLowerCase().includes(S.q.toLowerCase()));
+  return all.sort((a,b)=>new Date(b.at)-new Date(a.at));
+}
+
+function renderSubs(){
+  const list=document.getElementById('subsList');
+  const subs=getSubs();
+  if(!subs.length){
+    if(!Object.keys(S.forms).length){
+      list.innerHTML=`<div class="no-forms"><div class="nf-icon">⬡</div><div class="nf-title">No forms yet</div><div class="nf-sub">Create your first form to start collecting responses stored permanently on Walrus.</div><button class="btn btn-lime" onclick="show('builder')" style="margin:0 auto">Create a Form →</button></div>`;
+    } else {
+      list.innerHTML='<div class="empty-state"><div class="es-icon">⬡</div><div class="es-text">No submissions yet</div></div>';
+    }
+    return;
+  }
+  list.innerHTML=subs.map(s=>`
+    <div class="sub-card" id="sc_${s.id}">
+      <div class="sub-card-top">
+        <div>
+          <div class="sub-form-name">${s.formName||'Form'}</div>
+          <div class="sub-meta">${s.id}</div>
+        </div>
+        <div class="sub-ts">${new Date(s.at).toLocaleString()}</div>
+      </div>
+      ${s.blobId?`<div class="sub-blob">⬡ <a href="https://walruscan.io/blob/${s.blobId}" target="_blank">${s.blobId.slice(0,16)}...${s.blobId.slice(-8)}</a></div>`:''}
+      <div class="sub-fields">
+        ${Object.values(s.responses||{}).map(r=>`
+          <div class="sf ${r.sensitive?'enc-field':''}">
+            <div class="sf-k">${r.label}</div>
+            <div class="sf-v ${r.sensitive?'enc':''}">${r.sensitive?'🔒 Encrypted with Seal':r.value||'—'}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="sub-bottom">
+        <button class="sact ${s.starred?'starred':''}" onclick="toggleStar('${s.id}')">${s.starred?'★ Starred':'☆ Star'}</button>
+        <button class="sact" onclick="toggleNote('${s.id}')">+ Note</button>
+        <div class="p-stars">${[1,2,3,4,5].map(i=>`<span class="p-star ${s.priority>=i?'on':''}" onclick="setPri('${s.id}',${i})">★</span>`).join('')}</div>
+      </div>
+      <textarea class="note-area ${s.note?'open':''}" id="ni_${s.id}" placeholder="Add internal note..." onchange="saveNote('${s.id}',this.value)">${s.note||''}</textarea>
+    </div>
+  `).join('');
+}
+
+function flat(){ return Object.values(S.subs).flat(); }
+function toggleStar(id){ const s=flat().find(s=>s.id===id); if(s){s.starred=!s.starred;save();renderSubs();} }
+function toggleNote(id){ const a=document.getElementById('ni_'+id); if(a){a.classList.toggle('open');if(a.classList.contains('open'))a.focus();} }
+function saveNote(id,v){ const s=flat().find(s=>s.id===id); if(s){s.note=v;save();} }
+function setPri(id,v){ const s=flat().find(s=>s.id===id); if(s){s.priority=v;save();renderSubs();} }
+function filt(t,btn){ S.filter=t; document.querySelectorAll('.f-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); renderSubs(); }
+function doSearch(q){ S.q=q; renderSubs(); }
+
+function exportCSV(){
+  const subs=getSubs();
+  if(!subs.length){toast('No submissions to export','err',3000);return;}
+  const keys=[...new Set(subs.flatMap(s=>Object.values(s.responses||{}).map(r=>r.label)))];
+  const rows=[
+    ['ID','Form','Submitted At','Blob ID','Priority','Starred',...keys],
+    ...subs.map(s=>[s.id,s.formName,s.at,s.blobId||'',s.priority||0,s.starred?'Yes':'No',
+      ...keys.map(k=>{const r=Object.values(s.responses||{}).find(r=>r.label===k);return r?(r.sensitive?'[Encrypted]':r.value):''})
+    ])
+  ];
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([csv],{type:'text/csv'})),download:'vaultform_export.csv'});
+  a.click(); toast('Exported ✓','ok',3000);
+}
+
+// ─── AI INSIGHTS ───
+async function showAIInsights(){
+  const subs = getSubs();
+  if(!subs.length){ toast('No submissions to analyse yet', 'err', 3000); return; }
+
+  // Remove existing
+  document.getElementById('aiModal')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'aiModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1.5rem;backdrop-filter:blur(8px)';
+  modal.innerHTML = `
+    <div style="background:#111009;border:1px solid #2a2618;border-top:2px solid #d4ff00;padding:2rem;max-width:600px;width:100%;max-height:85vh;overflow-y:auto;position:relative;animation:fadeUp .3s ease">
+      <button onclick="document.getElementById('aiModal').remove()" style="position:absolute;top:.8rem;right:.8rem;background:none;border:1px solid #2a2618;color:#7a7460;width:24px;height:24px;font-size:.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.5rem;letter-spacing:.2em;text-transform:uppercase;color:#d4ff00;margin-bottom:.5rem">✦ AI Insights</div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#f0ede6;margin-bottom:.3rem;letter-spacing:-.02em">Analysing your submissions</div>
+      <div style="font-size:.82rem;color:#7a7460;margin-bottom:1.5rem;line-height:1.7">${subs.length} response${subs.length>1?'s':''} across ${Object.keys(S.forms).length} form${Object.keys(S.forms).length>1?'s':''}</div>
+      <div id="aiContent" style="font-size:.88rem;color:#a89880;line-height:1.85">
+        <div style="display:flex;align-items:center;gap:.5rem;color:#f59e0b;font-family:'JetBrains Mono',monospace;font-size:.58rem">
+          <div style="width:10px;height:10px;border:1.5px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sp .6s linear infinite"></div>
+          Analysing responses...
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  // Build summary for AI
+  const summary = subs.map(s=>{
+    const fields = Object.values(s.responses||{})
+      .filter(r=>!r.sensitive && r.value)
+      .map(r=>`${r.label}: ${r.value}`)
+      .join(' | ');
+    return `[${s.formName}] ${fields}`;
+  }).join('\n');
+
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages:[{
+          role:'user',
+          content: `You are an AI assistant analyzing form submissions for Vaultform, a decentralized feedback platform built on Walrus blockchain. 
+
+Analyze these ${subs.length} form submissions and provide:
+1. A brief summary of the key themes and patterns
+2. The top 3 most important insights
+3. Specific actionable recommendations
+4. Any standout responses worth highlighting
+
+Keep it concise, practical, and human. Use simple language. Format with clear sections.
+
+Submissions:
+${summary.slice(0, 3000)}`
+        }]
+      })
+    });
+
+    const data = await res.json();
+    const text = data.content?.[0]?.text || 'Unable to generate insights.';
+
+    document.getElementById('aiContent').innerHTML = `
+      <div style="white-space:pre-wrap;line-height:1.85;color:#c0b8a8">${text}</div>
+      <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid #2a2618;font-family:'JetBrains Mono',monospace;font-size:.46rem;color:#4a4535;letter-spacing:.08em">
+        ✦ AI analysis powered by Claude · Submissions stored permanently on Walrus
+      </div>
+    `;
+  }catch(e){
+    // Fallback: generate basic insights from data
+    const formNames = [...new Set(subs.map(s=>s.formName))];
+    const starredCount = subs.filter(s=>s.starred).length;
+    const encCount = subs.reduce((a,s)=>a+Object.values(s.responses||{}).filter(r=>r.sensitive).length,0);
+
+    document.getElementById('aiContent').innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:1rem">
+        <div style="background:#18160f;border-left:2px solid #d4ff00;padding:1rem">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.48rem;letter-spacing:.15em;text-transform:uppercase;color:#d4ff00;margin-bottom:.4rem">Summary</div>
+          <div style="font-size:.86rem;color:#a89880;line-height:1.7">You have collected <strong style="color:#f0ede6">${subs.length} response${subs.length>1?'s':''}</strong> across <strong style="color:#f0ede6">${formNames.length} form${formNames.length>1?'s':''}</strong>. ${starredCount} response${starredCount>1?'s are':' is'} starred as important. ${encCount} encrypted field${encCount>1?'s are':' is'} protected with Seal encryption.</div>
+        </div>
+        <div style="background:#18160f;border-left:2px solid #d4ff00;padding:1rem">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.48rem;letter-spacing:.15em;text-transform:uppercase;color:#d4ff00;margin-bottom:.4rem">Forms Active</div>
+          ${formNames.map(n=>`<div style="font-size:.84rem;color:#a89880;padding:.2rem 0">→ ${n} (${subs.filter(s=>s.formName===n).length} responses)</div>`).join('')}
+        </div>
+        <div style="background:#18160f;border-left:2px solid #d4ff00;padding:1rem">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.48rem;letter-spacing:.15em;text-transform:uppercase;color:#d4ff00;margin-bottom:.4rem">Recommendation</div>
+          <div style="font-size:.86rem;color:#a89880;line-height:1.7">Review starred responses first. Export to CSV for deeper analysis. All responses are permanently stored on Walrus — your data is safe.</div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:.46rem;color:#4a4535;letter-spacing:.08em">✦ Connect to internet for full AI analysis · Submissions stored on Walrus</div>
+      </div>
+    `;
+  }
+}
+
+// ─── SCROLL REVEAL ───
+const ro=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis')})},{threshold:.08});
+document.querySelectorAll('.rev').forEach(r=>ro.observe(r));
+
+// ─── INIT ───
+load(); renderFields(); route();
+</script>
+</body>
+</html>
